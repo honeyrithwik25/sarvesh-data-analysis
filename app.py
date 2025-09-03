@@ -10,7 +10,7 @@ st.title("📊 AI-Powered Data Analysis Platform")
 # Gemini API Setup
 API_KEY = st.secrets["API_KEY"]  # <-- we will set this in Streamlit Cloud Secrets
 genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 # ------------------ UPLOAD ------------------ #
 uploaded_file = st.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
