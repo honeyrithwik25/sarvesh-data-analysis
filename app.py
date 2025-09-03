@@ -5,7 +5,7 @@ import google.generativeai as genai
 
 # ------------------ CONFIG ------------------ #
 st.set_page_config(page_title="AI Data Analyzer", layout="wide")
-st.title("📊 AI-Powered Data Analysis Platform")
+st.title("📊 Sarvesh's Data Analysis Platform")
 
 # Gemini API Setup
 API_KEY = st.secrets["API_KEY"]  # <-- we will set this in Streamlit Cloud Secrets
@@ -25,7 +25,7 @@ if uploaded_file:
         st.write("### Preview of Data", df.head())
 
         # ------------------ USER QUERY ------------------ #
-        query = st.text_input("Ask your question in plain English:")
+        query = st.text_input("Ask your question in plain English and hit enter button:")
 
         if query:
             # Pass query + dataframe info to Gemini
