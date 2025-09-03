@@ -1,16 +1,15 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import google.generativeai as genai
+from openai import OpenAI
 
 # ------------------ CONFIG ------------------ #
 st.set_page_config(page_title="AI Data Analyzer", layout="wide")
 st.title("📊 Sarvesh's Data Analysis Platform")
 
-# Gemini API Setup
-API_KEY = st.secrets["API_KEY"]  # <-- we will set this in Streamlit Cloud Secrets
-genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
+# OpenRouter API Setup
+API_KEY = st.secrets["API_KEY"]  # <-- Set this in Streamlit Secrets
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=API_KEY)
 
 # ------------------ UPLOAD ------------------ #
 uploaded_file = st.file_uploader("Upload CSV or Excel", type=["csv", "xlsx"])
@@ -28,21 +27,42 @@ if uploaded_file:
         query = st.text_input("Ask your question in plain English and hit enter button:")
 
         if query:
-            # Pass query + dataframe info to Gemini
+            # Pre-compute with pandas (totals/averages etc.)
+            computed_answer = None
+            try:
+                if "total" in query.lower() or "sum" in query.lower():
+                    numeric_cols = df.select_dtypes(include="number").columns
+                    if len(numeric_cols) > 0:
+                        computed_answer = df[numeric_cols].sum().to_frame("Total").reset_index()
+                        st.markdown("### 📝 Computed Answer from Full Data")
+                        st.write(computed_answer)
+                elif "average" in query.lower() or "mean" in query.lower():
+                    numeric_cols = df.select_dtypes(include="number").columns
+                    if len(numeric_cols) > 0:
+                        computed_answer = df[numeric_cols].mean().to_frame("Average").reset_index()
+                        st.markdown("### 📝 Computed Answer from Full Data")
+                        st.write(computed_answer)
+            except Exception as e:
+                st.warning("Couldn't compute directly: " + str(e))
+
+            # Build prompt for OpenRouter
             prompt = f"""
-            You are a data analyst. Analyze the dataframe below based on the user's query.
-            Data (first 200 rows max): {df.head(50000).to_dict()}
+            You are a data analyst. The dataframe has {len(df)} rows and {len(df.columns)} columns.
+            Columns: {list(df.columns)}
             Query: {query}
-            Return:
-            - A clear explanation
-            - Any calculated table in markdown format if needed
-            - Suggested graph type (bar, line, pie, histogram, box)
+            If numeric calculations are needed, check if pandas computed them above.
+            Otherwise, provide logical analysis and explanation.
             """
 
-            response = model.generate_content(prompt)
-            answer = response.text
+            # Call OpenRouter model
+            response = client.chat.completions.create(
+                model="openai/gpt-4o-mini",  # You can swap to any OpenRouter model
+                messages=[{"role": "user", "content": prompt}]
+            )
 
-            st.markdown("### 📝 Analysis")
+            answer = response.choices[0].message.content
+
+            st.markdown("### 🤖 AI Analysis")
             st.write(answer)
 
             # ------------------ CHARTS ------------------ #
