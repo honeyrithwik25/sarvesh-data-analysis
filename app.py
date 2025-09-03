@@ -28,40 +28,21 @@ if uploaded_file:
         query = st.text_input("Ask your question in plain English and hit enter button:")
 
         if query:
-            # ✅ Try computing with Pandas (on the full dataset)
-            computed_answer = None
-
-            try:
-                if "total" in query.lower() or "sum" in query.lower():
-                    numeric_cols = df.select_dtypes(include="number").columns
-                    if len(numeric_cols) > 0:
-                        computed_answer = df[numeric_cols].sum().to_frame("Total").reset_index()
-                        st.markdown("### 📝 Computed Answer from Full Data")
-                        st.write(computed_answer)
-
-                elif "average" in query.lower() or "mean" in query.lower():
-                    numeric_cols = df.select_dtypes(include="number").columns
-                    if len(numeric_cols) > 0:
-                        computed_answer = df[numeric_cols].mean().to_frame("Average").reset_index()
-                        st.markdown("### 📝 Computed Answer from Full Data")
-                        st.write(computed_answer)
-
-            except Exception as e:
-                st.warning("Couldn't compute directly: " + str(e))
-
-            # ✅ Pass dataset info (schema + size only) + query to Gemini
+            # Pass query + dataframe info to Gemini
             prompt = f"""
-            You are a data analyst. The dataframe has {len(df)} rows and {len(df.columns)} columns.
-            Columns: {list(df.columns)}
+            You are a data analyst. Analyze the dataframe below based on the user's query.
+            Data (first 200 rows max): {df.head(50000).to_dict()}
             Query: {query}
-            If the user asked for numeric calculation like sum/average, I already computed above.
-            Otherwise, explain and analyze logically.
+            Return:
+            - A clear explanation
+            - Any calculated table in markdown format if needed
+            - Suggested graph type (bar, line, pie, histogram, box)
             """
 
             response = model.generate_content(prompt)
             answer = response.text
 
-            st.markdown("### 🤖 AI Analysis")
+            st.markdown("### 📝 Analysis")
             st.write(answer)
 
             # ------------------ CHARTS ------------------ #
