@@ -27,8 +27,10 @@ if uploaded_file:
         query = st.text_input("Ask your question in plain English and hit enter button:")
 
         if query:
-            # Pre-compute with pandas (totals/averages etc.)
             computed_answer = None
+            chart = None
+
+            # ✅ Direct computations with pandas
             try:
                 if "total" in query.lower() or "sum" in query.lower():
                     numeric_cols = df.select_dtypes(include="number").columns
@@ -36,27 +38,43 @@ if uploaded_file:
                         computed_answer = df[numeric_cols].sum().to_frame("Total").reset_index()
                         st.markdown("### 📝 Computed Answer from Full Data")
                         st.write(computed_answer)
+
                 elif "average" in query.lower() or "mean" in query.lower():
                     numeric_cols = df.select_dtypes(include="number").columns
                     if len(numeric_cols) > 0:
                         computed_answer = df[numeric_cols].mean().to_frame("Average").reset_index()
                         st.markdown("### 📝 Computed Answer from Full Data")
                         st.write(computed_answer)
+
+                elif " by " in query.lower():  # detect group by query
+                    words = query.lower().split()
+                    if "by" in words:
+                        by_index = words.index("by")
+                        if by_index > 0 and by_index < len(words) - 1:
+                            group_col = words[by_index + 1].capitalize()
+                            numeric_cols = df.select_dtypes(include="number").columns
+                            if group_col in df.columns and len(numeric_cols) > 0:
+                                computed_answer = df.groupby(group_col)[numeric_cols].sum().reset_index()
+                                st.markdown(f"### 📝 Grouped by {group_col}")
+                                st.write(computed_answer)
+                                # auto-bar chart
+                                chart = px.bar(computed_answer, x=group_col, y=numeric_cols[0],
+                                               title=f"{numeric_cols[0]} by {group_col}")
+
             except Exception as e:
                 st.warning("Couldn't compute directly: " + str(e))
 
-            # Build prompt for OpenRouter
+            # ✅ Build prompt for AI explanation
             prompt = f"""
             You are a data analyst. The dataframe has {len(df)} rows and {len(df.columns)} columns.
             Columns: {list(df.columns)}
             Query: {query}
-            If numeric calculations are needed, check if pandas computed them above.
+            If numeric calculations or group by are needed, they are shown above.
             Otherwise, provide logical analysis and explanation.
             """
 
-            # Call OpenRouter model
             response = client.chat.completions.create(
-                model="openai/gpt-4o-mini",  # You can swap to any OpenRouter model
+                model="openai/gpt-4o-mini",  # you can swap this with any OpenRouter model
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -66,16 +84,16 @@ if uploaded_file:
             st.write(answer)
 
             # ------------------ CHARTS ------------------ #
-            chart = None
             try:
-                if "average" in query.lower() or "mean" in query.lower():
-                    chart = px.bar(df.mean().reset_index(), x="index", y=0, title="Average of Columns")
-                elif "group" in query.lower() or "count" in query.lower():
-                    col = df.columns[0]
-                    chart = px.histogram(df, x=col, title=f"Grouping by {col}")
-                elif "percentage" in query.lower():
-                    col = df.columns[0]
-                    chart = px.pie(df, names=col, title=f"Percentage Distribution of {col}")
+                if not chart:  # if not already plotted in group by
+                    if "average" in query.lower() or "mean" in query.lower():
+                        chart = px.bar(df.mean().reset_index(), x="index", y=0, title="Average of Columns")
+                    elif "group" in query.lower() or "count" in query.lower():
+                        col = df.columns[0]
+                        chart = px.histogram(df, x=col, title=f"Grouping by {col}")
+                    elif "percentage" in query.lower():
+                        col = df.columns[0]
+                        chart = px.pie(df, names=col, title=f"Percentage Distribution of {col}")
             except Exception as e:
                 st.warning("Couldn't auto-generate chart: " + str(e))
 
